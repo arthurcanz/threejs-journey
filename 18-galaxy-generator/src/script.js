@@ -18,12 +18,12 @@ const scene = new THREE.Scene()
 //Galaxy
 const paramenters = {}
 paramenters.count = 100000
-paramenters.size = 0.01
+paramenters.size = 0.001
 paramenters.radius = 5
-paramenters.branches = 3
-paramenters.spin = 1
-paramenters.randomness = 0.2
-paramenters.randomnessPower = 3
+paramenters.branches = 5
+paramenters.spin = 0.6
+paramenters.randomness = 0.722
+paramenters.randomnessPower = 1.925
 paramenters.insideColor = '#c994ff'
 paramenters.outsideColor = '#350085'
 
