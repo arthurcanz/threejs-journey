@@ -7,9 +7,36 @@ import CANNON from 'cannon'
  * Debug
  */
 const gui = new GUI()
+const debugObject = {}
+
+debugObject.createSphere = () =>
+{
+    createSphere(Math.random() *0.5,
+    {x: (Math.random() *0.5) * 3,
+     y: (Math.random() *0.5) * 3,
+     z: (Math.random() *0.5) * 3
+    })
+}
+
+debugObject.createBox = () =>
+    {
+        createBox(
+        Math.random(),
+        Math.random(),
+        Math.random(),
+        {
+         x: (Math.random() *0.5) * 3,
+         y: (Math.random() *0.5) * 3,
+         z: (Math.random() *0.5) * 3
+        })
+    }
+
+gui.add(debugObject, 'createSphere')
+gui.add(debugObject, 'createBox')
 
 /**
  * Base
+ * 
  */
 // Canvas
 const canvas = document.querySelector('canvas.webgl')
@@ -35,6 +62,8 @@ const environmentMapTexture = cubeTextureLoader.load([
 //Physics
 //World
 const world = new CANNON.World()
+world.broadphase = new CANNON.SAPBroadphase(world)
+world.allowSleep = true
 world.gravity.set(0, - 9.82, 0)
 
 // Materials
@@ -81,7 +110,7 @@ scene.add(floor)
 /**
  * Lights
  */
-const ambientLight = new THREE.AmbientLight(0xffffff, 2.1)
+const ambientLight = new THREE.AmbientLight(0xffffff, .1)
 scene.add(ambientLight)
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6)
@@ -142,15 +171,22 @@ renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
 //Utils
-const createSphere = (radius, position) => {
-    const mesh = new THREE.Mesh(
-        new THREE.SphereBufferGeometry(radius, 20, 20),
-        new THREE.MeshStandardMaterial({
-            metalness: 0.3,
-            roughness: 0.4,
-            envMap: environmentMapTexture
-        })
-    )
+const objectToUpdate = []
+
+//Sphere
+const sphereGeometry = new THREE.SphereGeometry(1, 20, 20)
+const sphereMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.3,
+    roughness: 0.4,
+    envMap: environmentMapTexture
+})
+
+const createSphere = (radius, position) => 
+    {
+      ///Three.js mesh
+        
+    const mesh = new THREE.Mesh(sphereGeometry,sphereMaterial)
+    mesh.scale.set(radius, radius, radius)
     mesh.castShadow = true
     mesh.position.copy(new THREE.Vector3(position.x, position.y, position.z))
     scene.add(mesh)
@@ -165,9 +201,51 @@ const createSphere = (radius, position) => {
     })
     body.position.copy(position)
     world.addBody(body)
+
+    // Save in objects to update
+    objectToUpdate.push({
+        mesh: mesh,
+        body: body,
+    })
 }
 
 createSphere(0.5, new THREE.Vector3(0, 3, 0))
+
+//Box
+const boxGeometry = new THREE.BoxGeometry(1, 1, 1)
+const boxMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.3,
+    roughness: 0.4,
+    envMap: environmentMapTexture
+})
+
+const createBox = (width, height, depth, position) => 
+    {
+      ///Three.js mesh
+        
+    const mesh = new THREE.Mesh(boxGeometry,boxMaterial)
+    mesh.scale.set(width, height, depth)
+    mesh.castShadow = true
+    mesh.position.copy(new THREE.Vector3(position.x, position.y, position.z))
+    scene.add(mesh)
+
+    //Cannon.js body
+    const shape = new CANNON.Box(new CANNON.Vec3(width * 0.5, height * 0.5, depth * 0.5))
+    const body = new CANNON.Body({
+        mass: 1,
+        position: new CANNON.Vec3(0, 3, 0),
+        shape,
+        material: defaultMaterial
+    })
+    body.position.copy(position)
+    world.addBody(body)
+
+    // Save in objects to update
+    objectToUpdate.push({
+        mesh: mesh,
+        body: body,
+    })
+}
 
 /**
  * Animate
@@ -181,7 +259,14 @@ const tick = () =>
     const deltaTime = elapsedTime - oldElapsedTime
     oldElapsedTime = elapsedTime
 
+    // Update physics world
     world.step(1/60,deltaTime,3)
+
+     for(const object of objectToUpdate)
+     {
+        object.mesh.position.copy(object.body.position)
+        object.mesh.quaternion.copy(object.body.quaternion)
+     }
 
     // Update controls
     controls.update()
