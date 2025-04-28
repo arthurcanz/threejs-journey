@@ -31,8 +31,24 @@ debugObject.createBox = () =>
         })
     }
 
+debugObject.reset = () =>
+{
+    for(const object of objectToUpdate)
+    {
+        // Remove mesh from the scene
+        scene.remove(object.mesh)
+
+        // Remove body from the physics world
+        world.removeBody(object.body)
+    }
+
+    // Clear the objectsToUpdate array
+    objectToUpdate.length = 0
+}
+
 gui.add(debugObject, 'createSphere')
 gui.add(debugObject, 'createBox')
+gui.add(debugObject, 'reset')
 
 /**
  * Base
@@ -43,6 +59,21 @@ const canvas = document.querySelector('canvas.webgl')
 
 // Scene
 const scene = new THREE.Scene()
+
+//Sounds
+const hitSound = new Audio('/sounds/hit.mp3') // Ensure the file name is correct
+
+const playHitSound = (collision) =>
+{
+    const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+    if (impactStrength > 1.5)
+    {
+        hitSound.volume = Math.random()
+        hitSound.currentTime = 0;
+        hitSound.play();
+    }
+}
+
 
 /**
  * Textures
@@ -196,10 +227,11 @@ const createSphere = (radius, position) =>
     const body = new CANNON.Body({
         mass: 1,
         position: new CANNON.Vec3(0, 3, 0),
-        shape,
+        shape: shape,
         material: defaultMaterial
     })
     body.position.copy(position)
+    body.addEventListener('collide', playHitSound)
     world.addBody(body)
 
     // Save in objects to update
@@ -238,6 +270,7 @@ const createBox = (width, height, depth, position) =>
         material: defaultMaterial
     })
     body.position.copy(position)
+    body.addEventListener('collide', playHitSound)
     world.addBody(body)
 
     // Save in objects to update
