@@ -1,13 +1,33 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import GUI from 'lil-gui'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 
 /**
  * Base
  */
 // Debug
 const gui = new GUI()
+const debugAnimation = {}
+
+debugAnimation.foxWalk = () =>
+{
+    goTo(walkingAction)
+}
+
+debugAnimation.foxRunning = () =>
+{
+    goTo(runningAction , 2)
+}
+debugAnimation.foxIdle = () =>
+{
+    goTo(idleAction)
+}  
+
+gui.add(debugAnimation, 'foxWalk',1000 )
+gui.add(debugAnimation, 'foxRunning',1000 )
+gui.add(debugAnimation, 'foxIdle',1000 )
 
 // Canvas
 const canvas = document.querySelector('canvas.webgl')
@@ -15,22 +35,97 @@ const canvas = document.querySelector('canvas.webgl')
 // Scene
 const scene = new THREE.Scene()
 
-//Models
+/**
+ * Models
+ */
+const dracoLoader = new DRACOLoader()
+dracoLoader.setDecoderPath('/draco/')
+
 const gltfLoader = new GLTFLoader()
+gltfLoader.setDRACOLoader(dracoLoader)
+
+let mixer = null
+let idleAction = null
+let walkingAction = null
+let runningAction = null
+let currentAction = null
+let isKeyDown = false
+let isWalking = false
+let isRunning = false
+let movingPos = 0
+let foxObject = null
+let backwards = false
+
+const goTo = (to, timeScale=1) => {
+    if (currentAction) {
+        currentAction.crossFadeTo(to, 0.5)
+    }
+    to.reset()
+    to.timeScale = timeScale
+    to.play()
+    currentAction = to
+    
+}
+
+
+
+
+const setListeners = () => {
+    window.addEventListener("keydown", (ev) => {
+        if (ev.key === "w" && !isWalking) {
+            goTo(walkingAction)
+            movingPos = 0.008;
+            isWalking = true
+        } else if (ev.key === "Shift" && isWalking && !isRunning) {
+            goTo(runningAction, 3)
+            movingPos = 0.03;
+            isRunning = true 
+        } else if (ev.key === "s" && !isWalking && !isRunning) {
+            goTo(walkingAction, -1)
+            movingPos = - 0.008;
+            isWalking = true
+            isRunning = false
+            backwards = true
+        }
+    })
+
+    window.addEventListener("keyup", (ev) => {
+        
+
+        if (ev.key.toLowerCase() === "w" ||ev.key.toLowerCase() ===  "s") {
+            goTo(idleAction)
+            isWalking = false
+            isRunning = false
+            movingPos = 0
+
+        } if (ev.key === "Shift" && isRunning) {
+            goTo(walkingAction)
+            isRunning = false
+            movingPos = 0.005
+        }
+    })
+}
+ console.log(goTo)
+
 
 gltfLoader.load(
-    '/models/Duck/glTF/Duck.gltf',
+    '/models/Fox/glTF/Fox.gltf',
     (gltf) =>
     {
-        console.log(gltf)
-        
-        const children = [...gltf.scene.children]
+        foxObject = gltf.scene
+        foxObject.scale.set(0.025, 0.025, 0.025)
+        scene.add(foxObject)
 
-        for (const child of children)
-         {
-            scene.add(child)
-        }
-        
+        // Animation
+        mixer = new THREE.AnimationMixer(foxObject)
+        idleAction = mixer.clipAction(gltf.animations[0])
+        walkingAction = mixer.clipAction(gltf.animations[1])
+        runningAction = mixer.clipAction(gltf.animations[2])
+        idleAction.play()
+        currentAction = idleAction
+
+        setListeners()
+      
     }
 )
 
@@ -63,7 +158,7 @@ directionalLight.shadow.camera.left = - 7
 directionalLight.shadow.camera.top = 7
 directionalLight.shadow.camera.right = 7
 directionalLight.shadow.camera.bottom = - 7
-directionalLight.position.set(5, 5, 5)
+directionalLight.position.set(- 5, 5, 0)
 scene.add(directionalLight)
 
 /**
@@ -125,6 +220,19 @@ const tick = () =>
     const deltaTime = elapsedTime - previousTime
     previousTime = elapsedTime
 
+    // Model animation
+    if(mixer)
+    {
+        mixer.update(deltaTime)
+    }
+
+    if (foxObject) {
+        foxObject.position.z += movingPos
+        console.log(foxObject.position.z)
+        if (foxObject.position.z > 4 || foxObject.position.z < -4   )
+            movingPos = 0;
+    }
+
     // Update controls
     controls.update()
 
@@ -133,6 +241,7 @@ const tick = () =>
 
     // Call tick again on the next frame
     window.requestAnimationFrame(tick)
+    //setTimeout(tick, 1000)
 }
 
 tick()
